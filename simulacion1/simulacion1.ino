@@ -1,10 +1,10 @@
-static float a1 = 0.95895306;
-static float a2 = 0.16227342;
-static float a3 = -0.38178931;
-static float a4 = 0.63440622;
+static float a1 = 0.83953959;
+static float a2 = 0.07735878;
+static float a3 = -2.91209809;
+static float a4 = 0.53010445;
 
-static float b1 = 0.08723171;
-static float b2 = 0.8113671;
+static float b1 = 0.3410056;
+static float b2 = 6.18870276;
 
 static float a = 1e-8;
 static float b = 1.5e-6;
@@ -47,7 +47,7 @@ void loop() {
 
   matlab_send(tita, F);
   
-  delay(200);
+  delay(100);
 }
 
 void matlab_send(float dato1, float dato2){
