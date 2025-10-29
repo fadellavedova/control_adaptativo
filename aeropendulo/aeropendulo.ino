@@ -205,7 +205,7 @@ void loop() {
 
   end = micros();
   
-  //y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
+  y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
 
   float datos[8] = {tita, y_hat, theta[0], theta[1], theta[2], theta[3], 0, pwm};
 
