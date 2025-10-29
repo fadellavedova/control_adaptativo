@@ -1,19 +1,18 @@
-#define NA 3
+#define NA 2
 #define NB 1
 #define NC 1
 #define NPARAMS (NA+NB+NC)
 
-float theta[NPARAMS] = {0, 0, 0, 0, 0};
+float theta[NPARAMS] = {0, 0, 0, 0};
 float P[NPARAMS][NPARAMS] = {
-  {100,0,0,0,0},
-  {0,100,0,0,0},
-  {0,0,100,0,0},
-  {0,0,0,100,0},
-  {0,0,0,0,100}
+  {100,0,0,0},
+  {0,100,0,0},
+  {0,0,100,0},
+  {0,0,0,100},
 };
 
 // Histories (for regressors)
-float y_hist[NA] = {0, 0, 0};
+float y_hist[NA] = {0, 0};
 float u_hist[NB] = {0};
 float e_hist[NC] = {0};
 
@@ -53,7 +52,7 @@ void setup() {
 
 
 void ELS_update(float y_k, float y_hist[], float u_hist[], float e_hist[],
-                float lambda_f = 1.0) {
+                float lambda_f) {
 
   const int n = NPARAMS;
   float phi[n];
@@ -61,7 +60,6 @@ void ELS_update(float y_k, float y_hist[], float u_hist[], float e_hist[],
   // φ = [y[k-1], y[k-2], y[k-3], u[k-1], e[k-1]]
   phi[0] = y_hist[0];
   phi[1] = y_hist[1];
-  phi[2] = y_hist[2];
   phi[3] = u_hist[0];
   phi[4] = e_hist[0];
 
@@ -89,11 +87,6 @@ void ELS_update(float y_k, float y_hist[], float u_hist[], float e_hist[],
   for (int i = 0; i < n; i++) theta[i] += K[i] * eps;
 
   // Update P = (P - K φᵀ P) / λ
-  float temp[n][n];
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      temp[i][j] = P[i][j] - K[i] * 0; // initialize
-
   // outer(K, φ)
   float Kphi[n][n];
   for (int i = 0; i < n; i++)
@@ -117,13 +110,11 @@ void ELS_update(float y_k, float y_hist[], float u_hist[], float e_hist[],
       P[i][j] = newP[i][j];
 
   // shift histories for next step
-  for (int i = 2; i >= 1; i--) y_hist[i] = y_hist[i-1];
+  for (int i = 1; i >= 1; i--) y_hist[i] = y_hist[i-1];
   y_hist[0] = y_k;
 
-  for (int i = 1; i >= 1; i--) u_hist[i] = u_hist[i-1];
-  u_hist[0] = u_hist[0]; // update with current u later
+  u_hist[0] = u_k; // update with current u later
 
-  for (int i = 1; i >= 1; i--) e_hist[i] = e_hist[i-1];
   e_hist[0] = eps;
 }
 

@@ -2,7 +2,7 @@
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 
-#define NA 3
+#define NA 2
 #define NB 1
 #define NC 1
 #define NPARAMS (NA+NB+NC)
@@ -23,21 +23,20 @@ sensors_event_t a, g, temp;
 int motor_pin1 = 2;
 int motor_pin2 = 4;
 
-float theta[NPARAMS] = {0, 0, 0, 0, 0};
+float theta[NPARAMS] = {0, 0, 0, 0};
 float P[NPARAMS][NPARAMS] = {
-  {100,0,0,0,0},
-  {0,100,0,0,0},
-  {0,0,100,0,0},
-  {0,0,0,100,0},
-  {0,0,0,0,100}
+  {100,0,0,0},
+  {0,100,0,0},
+  {0,0,100,0},
+  {0,0,0,100},
 };
 
 // Histories (for regressors)
-float y_hist[NA] = {0, 0, 0};
+float y_hist[NA] = {0, 0};
 float u_hist[NB] = {0};
 float e_hist[NC] = {0};
 
-float lambda_f = 0.99;
+float lambda_f = 0.995;
 int pwm;
 float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_hist[],
                 float lambda_f) {
@@ -48,9 +47,8 @@ float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
   // φ = [y[k-1], y[k-2], y[k-3], u[k-1], e[k-1]]
   phi[0] = y_hist[0];
   phi[1] = y_hist[1];
-  phi[2] = y_hist[2];
-  phi[3] = u_hist[0];
-  phi[4] = e_hist[0];
+  phi[2] = u_hist[0];
+  phi[3] = e_hist[0];
 
   // ŷ = θᵀ φ
   float y_hat = 0;
@@ -66,6 +64,7 @@ float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
 
   float denom = lambda_f;
   for (int i = 0; i < n; i++) denom += phi[i] * Pphi[i];
+  //if (denom < 1e-9) denom += 1e-9;
 
   // K = P φ / denom
   float K[n];
@@ -75,10 +74,6 @@ float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
   for (int i = 0; i < n; i++) theta[i] += K[i] * eps;
 
   // Update P = (P - K φᵀ P) / λ
-  float temp[n][n];
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < n; j++)
-      temp[i][j] = P[i][j] - K[i] * 0; // initialize
 
   // outer(K, φ)
   float Kphi[n][n];
@@ -103,8 +98,9 @@ float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
       P[i][j] = newP[i][j];
 
   // shift histories for next step
-  for (int i = 2; i >= 1; i--) y_hist[i] = y_hist[i-1];
+  y_hist[1] = y_hist[0];
   y_hist[0] = y_k;
+  
 
   //for (int i = 1; i >= 1; i--) u_hist[i] = u_hist[i-1];
   u_hist[0] = u_k; // update with current u later
@@ -172,13 +168,17 @@ void loop() {
   digitalWrite(motor_pin1, HIGH);
   digitalWrite(motor_pin2, LOW);
 
-  if(count <= 300){
+  //pwm = 100 + generateGaussianNoise(0, 10);
+
+/*
+  if(count <= 900){
     pwm = 100;
   }else{
     pwm = 130;
   }
+*/
 
-/*
+
   if(count < 200) {
     pwm = 0 ;
   } 
@@ -186,16 +186,16 @@ void loop() {
     pwm = 100 + generateGaussianNoise(0, 10);
   }
   else if(count >= 400 && count < 600){
-    pwm = 100 + generateGaussianNoise(0, 10);
+    pwm = 180 + generateGaussianNoise(0, 10);
   }
   else if(count >= 600 && count < 800) {
-    pwm = 100 + generateGaussianNoise(0, 10);
+    pwm = 180 + generateGaussianNoise(0, 10);
   }
   else if(count >= 800 && count < 1000){
     pwm = 0;
     count = 0;
   }
-*/
+
 
   analogWrite(9, pwm);
   count++;
@@ -205,9 +205,9 @@ void loop() {
 
   end = micros();
   
-  y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
+  //y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
 
-  float datos[8] = {tita, y_hat, theta[0], theta[1], theta[2], theta[3], theta[4], pwm};
+  float datos[8] = {tita, y_hat, theta[0], theta[1], theta[2], theta[3], 0, pwm};
 
   matlab_send(datos, sizeof(datos)/sizeof(float));
 
@@ -243,9 +243,9 @@ float generateGaussianNoise(float mean, float stdDev) {
   }
 
   if((sum - 6.0) * stdDev + mean >= 0)
-    return 10;
+    return 0;
   else
-    return -10;
+    return 0;
 
 }
 
