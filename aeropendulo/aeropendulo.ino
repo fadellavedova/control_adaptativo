@@ -186,10 +186,10 @@ void loop() {
     pwm = 100 + generateGaussianNoise(0, 10);
   }
   else if(count >= 400 && count < 600){
-    pwm = 180 + generateGaussianNoise(0, 10);
+    pwm = 130 + generateGaussianNoise(0, 10);
   }
   else if(count >= 600 && count < 800) {
-    pwm = 180 + generateGaussianNoise(0, 10);
+    pwm = 130 + generateGaussianNoise(0, 10);
   }
   else if(count >= 800 && count < 1000){
     pwm = 0;
