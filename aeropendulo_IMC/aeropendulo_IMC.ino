@@ -32,6 +32,10 @@ float P[NPARAMS][NPARAMS] = {
   {0,0,0,100},
 };
 
+float a1 = 0;
+float a2 = 0;
+float b1 = 0;
+
 // Historia (para los regresores)
 float y_hist[NA] = {0, 0};
 float u_hist[NB] = {0};
@@ -43,20 +47,22 @@ int pwm;
 float Kp = 0;
 float Ki = 0;
 float Kd = 0;
-float tita_d = 0.8;
+
+float tita_d = 0.5;
 float error = 0;
 float error_anterior = 0;
 float I = 0;
 float D = 0;
-float beta = 3;
-float gamma_derivador = 2*beta;
+
+float beta = 1.5;
+float gamma_derivador = b;
 float denom = 0;
 float Kbeta = 0;
 float tau2 = 0;
 float cetatau = 0;
 float b = dt;
-float termino = 0;
-float kappa = 0.5;
+float kappa = 1;
+float dfactor = 1;
 
 float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_hist[],
                 float lambda_f) {
@@ -127,6 +133,10 @@ float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
   return y_hat;
 }
 
+
+
+
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -172,6 +182,10 @@ void setup() {
 }
 
 int count = 0;
+
+
+
+
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -220,16 +234,29 @@ void loop() {
   tita = filtro_complementario(tita, alpha);
 
   
-  if(count < 1500) {
+  if(count < 2000) {
     pwm = 100 + generateGaussianNoise(0, 10);
 
     y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
-  } 
-  else {
 
+    if (count > 1800) {
+        a1 = a1 + theta[0];
+        a2 = a2 + theta[1];
+        b1 = b1 + theta[2];
+      }
+
+  } 
+  else if (count < 2250) {
+    pwm = 0;
+    theta[0] = a1/199;
+    theta[1] = a2/199;
+    theta[2] = b1/199;
+  }
+  else {
+      //y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
       //if(termino < -0.9) termino = -0.99; 
       denom = -theta[0] - theta[1] + 1;
-      if(denom<0.0001 && denom>-0.0001) denom=0.0001;
+   // if(denom<0.0001 && denom>-0.0001) denom=0.0001;
       Kbeta = beta*theta[2]/denom;
       tau2 = dt*dt/denom;
       cetatau = (0.5)*dt*(-theta[0] + 2)/denom;
@@ -237,7 +264,7 @@ void loop() {
 
       Kp = kappa*(2*cetatau - b)/(Kbeta) + (1-kappa)*Kp;
       Ki = kappa*1/(Kbeta) + (1-kappa)*Ki;
-      Kd = kappa*(tau2 - 2*b*cetatau + b*b)/(Kbeta) + (1-kappa)*Kd;
+      Kd = dfactor*kappa*(tau2 - 2*b*cetatau + b*b)/(Kbeta) + (1-kappa)*Kd;
 
       //Kp = (4*cetatau - beta)/(4*Kbeta);
       //Ki = 0.5/Kbeta;
@@ -245,7 +272,7 @@ void loop() {
 
       error_anterior = error;
       error = tita_d - tita;
-      if(error < 1e-2) error = 0;
+      if(abs(error) < 1e-5) error = 0;
       
       pwm = int(Kp*error + Ki*(I + (dt/2)*error + (dt/2)*error_anterior) + Kd*(2*(error-error_anterior)/dt - D));
 
