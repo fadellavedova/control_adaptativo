@@ -3,11 +3,13 @@
 #include <Wire.h>
 #include "Complex.h"
 
-#define NA 2
+#define D 2
+#define NA 3
 #define NB 1
 #define NC 1
-#define NACL 3
-#define NPARAMS (NA+NB+NC)
+#define NU (NB + 1 + D - 1)
+#define NUF 1
+#define NPARAMS (NA+NU+NUF)
 
 Adafruit_MPU6050 mpu;
 
@@ -25,12 +27,14 @@ sensors_event_t a, g, temp;
 int motor_pin1 = 2;
 int motor_pin2 = 4;
 
-float theta[NPARAMS] = {0, 0,0, 0};
+float theta[NPARAMS] = {0, 0, 0, 0, 0, 0.01};
 float P[NPARAMS][NPARAMS] = {
-  {100,0,0,0},
-  {0,100,0,0},
-  {0,0,100,0},
-  {0,0,0,100},
+  {100,0,0,0,0,0},
+  {0,100,0,0,0,0},
+  {0,0,100,0,0,0},
+  {0,0,0,100,0,0},
+  {0,0,0,0,100,0},
+  {0,0,0,0,0,100}
 };
 
 int pwm_view = 0;
@@ -39,48 +43,41 @@ float a2 = 0;
 float b1 = 0;
 
 // Historia (para los regresores)
-float y_hist[NA] = {0, 0};
-float u_hist[NB] = {0};
+float parametros[5] = {0,0,0,0,0};
+float y_hist[4] = {0, 0, 0, 0};
+float u_hist[4] = {0, 0, 0, 0};
 float e_hist[NC] = {0};
-float yf_hist[NACL] = {0, 0, 0}; 
-float uf_hist[NACL] = {0, 0, 0};
+
 
 float lambda_f = 0.99;
-int pwm;
+float lambda_b0 = 0.001;
+int pwm=40;
 
-float Kp = 0;
-float Ki = 0;
-float Kd = 0;
+float u_k1 = 0;
 
-bool promediando = false;
-int count_promedio = 0;
-
-float termino_1;float termino_2;float termino_3;
 float tita_d = 0.45;
 
 float denom = 0;
 
-
-float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_hist[], float yf_hist[], float uf_hist[],
-                float lambda_f) {
+int limite = 160;
+float MPC_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_hist[], float r_kd,
+                float lambda_f, float lambda_b0, float parametros[]) {
 
   const int n = NPARAMS;
   float phi[n];
+  float phi_C[n];
 
-  // phi = [y[k-1], y[k-2],u[k-1], e[k-1]]
-  yf_k = -acl1*yf_hist[0] - acl2*yf_hist[1] - acl3*yf_hist[2] + y_k
-  uf_k = -acl1*uf_hist[0] - acl2*uf_hist[1] - acl3*uf_hist[2] + u_k
-
-  phi[0] = uf_k;
-  phi[1] = uf_hist[0];
-  phi[2] = yf_k;
-  phi[3] = yf_hist[0];
-
+  phi[0] = -y_hist[1];
+  phi[1] = -y_hist[2];
+  phi[2] = -y_hist[3];
+  phi[3] = -u_hist[2]; //-d-1
+  phi[4] = -u_hist[3];
+  phi[5] = y_k + lambda_b0*u_hist[1];
 
   // y_hat = tita phi
-  float y_hat = 0;
-  for (int i = 0; i < n; i++) y_hat += theta[i] * phi[i];
-  float eps = y_k - y_hat;
+  float u_hat = 0;
+  for (int i = 0; i < n; i++) u_hat += theta[i] * phi[i];
+  float eps = u_hist[1] - u_hat;
 
   // denominador = lambda + phit P phi
   float Pphi[n];
@@ -91,7 +88,7 @@ float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
 
   float denom = lambda_f;
   for (int i = 0; i < n; i++) denom += phi[i] * Pphi[i];
-  //if (denom < 1e-9) denom += 1e-9;
+  //if (denom < 1e-9) denom += 1e-9; //por las dudas
 
   // Calculo la ganancia 
   float K[n];
@@ -122,34 +119,29 @@ float ELS_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
   for (int i = 0; i < n; i++)
     for (int j = 0; j < n; j++)
       P[i][j] = newP[i][j];
-
+  
+  phi_C[0] = -y_k;
+  phi_C[1] = -y_hist[0];
+  phi_C[2] = -y_hist[1];
+  phi_C[3] = -u_hist[0];
+  phi_C[4] = -u_hist[1];
+  phi_C[5] = r_kd;
   // Controladores tilde
-  br0 = theta[0];
-  br1 = theta[1];
-  bs0 = theta[2];
-  bs1 = theta[3];
 
-  // Controladores ene a zeta i
-  r0 = 1;
-  r1 = br1/br0;
-  s0 = bs0/br0;
-  s1 = bs1/br0;
-  t0 = (acl1 + acl2+ acl3 + 1)/br0;
+  float u_k1 = 0;
+  for (int i = 0; i < n; i++) u_k1 += theta[i] * phi_C[i];
 
-  u_k1 = t0*ref - s0*y_k - s1*y_hist[0] - r1*u_hist[0];
+  //u_k1 = -u_k1;
   // Muevo los indices.
+  y_hist[3] = y_hist[2];
+  y_hist[2] = y_hist[1];
   y_hist[1] = y_hist[0];
   y_hist[0] = y_k;
   
+  u_hist[3] = u_hist[2];
+  u_hist[2] = u_hist[1];
+  u_hist[1] = u_hist[0];
   u_hist[0] = u_k;
-
-  uf_hist[2] = uf_hist[1];
-  uf_hist[1] = uf_hist[0];
-  uf_hist[0] = uf_k; 
-
-  yf_hist[2] = yf_hist[1];
-  yf_hist[1] = yf_hist[0];
-  yf_hist[0] = yf_k; 
   
   e_hist[0] = eps;
 
@@ -217,6 +209,26 @@ void loop() {
   digitalWrite(motor_pin1, HIGH);
   digitalWrite(motor_pin2, LOW);
 //PRBS cte para identificacion con los parametros.
+
+  count++;
+
+  if(count<=300) {
+    lambda_f = 0.99;
+    tita_d = 0.7;
+  }else if(count<=1000) {
+    lambda_f = 0.99;
+  }else if(count<=2000) {
+    tita_d = 0.5;
+  }else if(count<=2500){
+    tita_d = 0.9;
+  }else if(count<=5000) {
+    tita_d = 0.7;
+  }else if(count<=5500) {
+    tita_d = 0.4;
+  }else if(count<=6000){
+    tita_d = 0.9;
+  }
+  else tita_d = 0.7;
   
 
 /*
@@ -250,97 +262,29 @@ void loop() {
 
 
 
-  analogWrite(10, pwm);
-  count++;
+  
  // Serial.println("mori1");
-  if(count < 4500) tita_d = 0.6;
-  /*
-  else if (count < 5500) tita_d = 0.6;
-  else if (count < 6500) tita_d = 0.8;
-  else if (count < 7500) tita_d = 0.65;
-  else if (count < 8500) tita_d = 0.50;
-  else if (count < 9500) tita_d = 0.35;
-  */
+  
   tita = filtro_complementario(tita, alpha);
-  //Serial.println("mori_imu");
-  if(count < 1000) {
-    pwm = 80 + generateGaussianNoise(0, 10, 40);
-   // Serial.println("mori2");
-    y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
-   // Serial.println("mori3");
-  } 
-  else if (count < 3000) {
-    pwm = 80 + generateGaussianNoise(0, 10, 40);
+  count++;
 
-    y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
-    a1 += theta[0];
-    a2 += theta[1];
-    b1 += theta[2];
-  }
-  else if (count < 3200) {
-    theta[0] = a1/1999;
-    theta[1] = a2/1999;
-    theta[2] = b1/1999;
+  pwm = MPC_update(tita, pwm, y_hist, u_hist, e_hist, tita_d, lambda_f, lambda_b0, parametros);
+  pwm_view = pwm;
 
-    pwm = 0;
-    denom = -theta[0] - theta[1] + 1;
-    K = theta[2]/denom;
-    tau2 = dt*dt/denom;
-    tau = sqrt(abs(tau2));
-    ceta = (0.5)*dt*(-theta[0] + 2)/(denom*tau);
-    b = dt;
-
-    Kp = (2*ceta*tau - b)/(K*beta);
-    Ki = 1/(K*beta);
-    Kd = (tau2 - 2*b*ceta*tau + b*b)/(K*beta);
-
-    count_promedio++;
-  }
-  else {
-      //y_hat = ELS_update(tita, pwm, y_hist, u_hist, e_hist, lambda_f);
-      //if(termino < -0.9) termino = -0.99; 
-      // if(denom<0.0001 && denom>-0.0001) denom=0.0001;
-
-      //Kp = (4*cetatau - beta)/(4*Kbeta);
-      //Ki = 0.5/Kbeta;
-      //Kd = (4*tau2 - 4*beta*cetatau + beta*beta)/(8*Kbeta);
-
-      error_anterior = error;
-      error = tita_d - tita;
-    //  if(abs(error) < 1e-5) error = 0;
-    //  pwm = Kp*error + Ki*(I + (dt/2)*error + (dt/2)*error_anterior) + Kd*(2*(error-error_anterior)/dt - D);
-
-
-      D= (2/dt)*(error - error_anterior)*(1/(2/dt + 1)) - D * ((1-(2/dt*gamma_derivador))/(2/dt +1));
-      I = I + (dt/2)*error + (dt/2)*error_anterior;
-
-      termino_1 = Kp*error;
-      termino_2 = Ki*I;
-      termino_3 = Kd*D;
-     // termino_3 = Kd*(2*(error-error_anterior)/dt - D);
-      pwm = termino_1 + termino_2 + termino_3;
-
-     //D = 2*(error-error_anterior)/dt - D;
-
-
-      //pwm = 120;
-      //D = (error-error_anterior - D*(dt - 1))/gamma_derivador;
-
-
-      pwm_view = pwm;
-      pwm = saturacion(pwm);
-     // int pwm_viejo = pwm;
-      
-  }
-
-
+  pwm = int(pwm);
+  if(count>1000){limite = 180;}
+  pwm = saturacion(pwm,limite);
+  analogWrite(10, pwm);
+  // int pwm_viejo = pwm;
   end = micros();
   
 
   //float datos[8] = {tau2,tita,y_hat,pwm_view,Ki,theta[0],theta[1],theta[2]};
   //float datos[8] = {tita, y_hat, theta[0], theta[1], theta[2], denom, Ki, pwm};
-  float datos[8] = {tita, theta[0], theta[1], theta[2], Kp, Ki, Kd, pwm};
- //Serial.println("mori_datos");
+  //float datos[8] = {tita, theta[0], theta[1], theta[2], theta[3], 0, tita_d, pwm_view};
+  //float datos[8] = {tita,uf_hist[0],uf_hist[1],uf_hist[2],yf_hist[0],yf_hist[1],yf_hist[2], pwm_view};
+  float datos[8] = {tita, tita_d, pwm_view, theta[0],theta[1],theta[2],theta[3],0};
+  //Serial.println("mori_datos");
   //float datos[8] = {tita, termino_1,termino_2,termino_3, theta[0], Ki, Kd, pwm_view};
 
   matlab_send(datos, sizeof(datos)/sizeof(float));
@@ -385,7 +329,7 @@ float generateGaussianNoise(float mean, float stdDev,float cant) {
 
 }
 
-int saturacion(int pwm) {
-  return constrain(pwm, 0, 220);
+int saturacion(int pwm,int limite) {
+  return constrain(pwm, 0, limite);
 }
 
