@@ -65,7 +65,7 @@ float tita_d = 0.45;
 
 float denom = 0;
 
-int limite = 160;
+int limite = 150;
 float STR_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_hist[], float yf_hist[], float uf_hist[],float ref,
                 float lambda_f,float parametros[]) {
 
@@ -238,21 +238,29 @@ void loop() {
 
   if(count<=300) {
     lambda_f = 0.99;
-    tita_d = 0.7;
+    tita_d = 0.9;
   }else if(count<=1000) {
-    lambda_f = 0.999;
+    lambda_f = 0.998;
   }else if(count<=2000) {
-    tita_d = 0.4;
+    tita_d = 1.1;
   }else if(count<=2500){
-    tita_d = 0.9;
+    tita_d = 1.5;
+    lambda_f = 0.995;
+  }else if(count<=3500) {
+    tita_d = 1.7;
+  }else if(count<=4000) {
+    tita_d = 1.9;
+    lambda_f = 0.9999;
+  }else if(count<=4500){
+    tita_d = 2.1;
   }else if(count<=5000) {
-    tita_d = 0.7;
+    tita_d = 2.3;
   }else if(count<=5500) {
-    tita_d = 0.4;
+    tita_d = 2.5;
   }else if(count<=6000){
-    tita_d = 0.9;
+    tita_d = 2.7;
   }
-  else tita_d = 0.7;
+  else tita_d = 2.9;
   
 
 /*
@@ -295,7 +303,7 @@ void loop() {
   pwm_view = pwm;
 
   pwm = int(pwm);
-  if(count>1000){limite = 220;}
+  if(count>1000){limite = 250;}
   pwm = saturacion(pwm,limite);
   analogWrite(10, pwm);
   // int pwm_viejo = pwm;
