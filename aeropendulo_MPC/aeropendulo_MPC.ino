@@ -48,8 +48,8 @@ float u_hist[3] = {0, 0, 0};
 float e_hist[NC] = {0};
 
 
-float lambda_f = 0.99;
-float lambda_b0 = 0;
+float lambda_f = 0.995;
+float lambda_b0 = 0.075;
 int pwm=40;
 
 float u_k1 = 0;
@@ -69,13 +69,13 @@ float MPC_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
   phi[0] = -y_hist[0];
   phi[1] = -y_hist[1];
   phi[2] = -y_hist[2];
-  phi[3] = -u_hist[1]; //-d-1
-  phi[4] = y_k + lambda_b0*u_hist[0];
+  phi[3] = -(u_hist[1] - u_hist[2]); //-d-1
+  phi[4] = y_k + lambda_b0*(u_hist[0] - u_hist[1]);
 
   // y_hat = tita phi
   float u_hat = 0;
   for (int i = 0; i < n; i++) u_hat += theta[i] * phi[i];
-  float eps = u_hist[0] - u_hat;
+  float eps = (u_hist[0] - u_hist[1]) - u_hat;
 
   // denominador = lambda + phit P phi
   float Pphi[n];
@@ -121,11 +121,11 @@ float MPC_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
   phi_C[0] = -y_k;
   phi_C[1] = -y_hist[0];
   phi_C[2] = -y_hist[1];
-  phi_C[3] = -u_hist[0];
+  phi_C[3] = -(u_k - u_hist[0]);
   phi_C[4] = r_kd;
   // Controladores tilde
 
-  float u_k1 = 0;
+  float u_k1 = u_k;
   for (int i = 0; i < n; i++) u_k1 += theta[i] * phi_C[i];
 
   //u_k1 = -u_k1;
@@ -208,22 +208,22 @@ void loop() {
   count++;
 
   if(count<=300) {
-    lambda_f = 0.99;
+
     tita_d = 0.7;
   }else if(count<=1000) {
-    lambda_f = 0.99;
+    lambda_f = 0.995;
   }else if(count<=2000) {
-    tita_d = 0.7;
+    tita_d = 0.9;
   }else if(count<=2500){
     tita_d = 0.7;
   }else if(count<=5000) {
-    tita_d = 0.7;
+    tita_d = 0.5;
   }else if(count<=5500) {
-    tita_d = 0.7;
+    tita_d = 0.9;
   }else if(count<=6000){
     tita_d = 0.7;
   }
-  else tita_d = 0.7;
+  else tita_d = 0.5;
   
 
 /*

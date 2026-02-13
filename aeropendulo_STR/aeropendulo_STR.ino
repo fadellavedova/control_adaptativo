@@ -235,7 +235,7 @@ void loop() {
 //PRBS cte para identificacion con los parametros.
 
   count++;
-
+/*
   if(count<=300) {
     lambda_f = 0.99;
     tita_d = 0.9;
@@ -261,7 +261,33 @@ void loop() {
     tita_d = 2.7;
   }
   else tita_d = 2.9;
-  
+  */
+
+  if(count<=300) {
+    lambda_f = 0.99;
+    tita_d = 0.7;
+  }else if(count<=1000) {
+    lambda_f = 0.999;
+  }else if(count<=2000) {
+    tita_d = 0.9;
+  }else if(count<=2500){
+    tita_d = 0.7;
+    lambda_f = 0.999;
+  }else if(count<=3500) {
+    tita_d = 0.5;
+  }else if(count<=4000) {
+    tita_d = 0.7;
+    lambda_f = 0.995;
+  }else if(count<=4500){
+    tita_d = 0.9;
+  }else if(count<=5000) {
+    tita_d = 0.7;
+  }else if(count<=5500) {
+    tita_d = 0.9;
+  }else if(count<=6000){
+    tita_d = 0.7;
+  }
+  else tita_d = 20.7;
 
 /*
 //Respuesta al impulso
