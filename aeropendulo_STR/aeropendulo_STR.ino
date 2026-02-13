@@ -138,7 +138,7 @@ float STR_update(float y_k, float u_k, float y_hist[], float u_hist[], float e_h
   bs0 = theta[2];
   bs1 = theta[3];
 
-  // Controladores ene a zeta i
+  // Controladores reales
   r0 = 1;
   r1 = br1/br0;
   s0 = bs0/br0;
