@@ -4,6 +4,7 @@ Aplicación de técnicas de identificación y control adaptativo en un aeropénd
 <p align ="center">
   <img src="https://github.com/user-attachments/assets/748c1add-79b6-4802-97fe-2ba5cb7c7fb0" width="200">
 </p>
+
 ## Descripción
 
 Este proyecto implementa algoritmos de identificación y control adaptativo para el control de un aeropéndulo. El trabajo combina técnicas avanzadas de control automático con experimentación práctica.
